@@ -60,7 +60,7 @@
     "gaming"
   ],
   "author": "mcbk-mcp contributors",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "engines": {
     "node": ">=16.0.0"
   }
