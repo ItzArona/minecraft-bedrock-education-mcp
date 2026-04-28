@@ -1,15 +1,15 @@
 /**
- * 多言語対応システム（i18n - Internationalization）
- * エラーメッセージ、成功メッセージ、情報メッセージの言語切り替え
+ * 多语言支持系统 (i18n - Internationalization)
+ * 错误消息、成功消息、信息消息的语言切换
  */
 
 /**
- * サポートされる言語
+ * 支持的语言
  */
-export type SupportedLocale = "en" | "ja";
+export type SupportedLocale = "en" | "ja" | "zh";
 
 /**
- * メッセージ翻訳マップの型定義
+ * 消息翻译映射的类型定义
  */
 export type TranslationMap = Record<
   string,
@@ -17,56 +17,60 @@ export type TranslationMap = Record<
 >;
 
 /**
- * 言語別のメッセージコレクション
+ * 按语言划分的消息集合
  */
 export interface LocaleMessages {
   en: TranslationMap;
   ja: TranslationMap;
+  zh: TranslationMap;
 }
 
 /**
- * グローバル言語設定マネージャー
+ * 全局语言设置管理器
  */
 class LocaleManager {
-  private currentLocale: SupportedLocale = "en"; // デフォルトは英語
+  private currentLocale: SupportedLocale = "en"; // 默认为英语
 
   /**
-   * 現在の言語を取得
+   * 获取当前语言
    */
   getLocale(): SupportedLocale {
     return this.currentLocale;
   }
 
   /**
-   * 言語を設定
-   * @param locale 設定する言語（'en' または 'ja'）
+   * 设置语言
+   * @param locale 要设置的语言 ('en', 'ja' 或 'zh')
    */
   setLocale(locale: SupportedLocale): void {
     this.currentLocale = locale;
   }
 
   /**
-   * 環境変数から言語を自動検出
+   * 从环境变量中自动检测语言
    */
   detectLocale(): SupportedLocale {
-    // 1. 環境変数 MINECRAFT_MCP_LANG をチェック
+    // 1. 检查环境变量 MINECRAFT_MCP_LANG
     const envLang = process.env.MINECRAFT_MCP_LANG;
-    if (envLang === "ja" || envLang === "en") {
-      return envLang;
+    if (envLang === "ja" || envLang === "en" || envLang === "zh") {
+      return envLang as SupportedLocale;
     }
 
-    // 2. システム言語をチェック
+    // 2. 检查系统语言
     const systemLang = process.env.LANG || process.env.LANGUAGE || "";
+    if (systemLang.startsWith("zh")) {
+      return "zh";
+    }
     if (systemLang.startsWith("ja")) {
       return "ja";
     }
 
-    // 3. デフォルトは英語
+    // 3. 默认为英语
     return "en";
   }
 
   /**
-   * 自動検出した言語を適用
+   * 应用自动检测到的语言
    */
   autoDetect(): void {
     this.currentLocale = this.detectLocale();
@@ -74,27 +78,27 @@ class LocaleManager {
 }
 
 /**
- * グローバルインスタンス（シングルトン）
+ * 全局实例 (单例)
  */
 export const localeManager = new LocaleManager();
 
 /**
- * 多言語メッセージを取得するヘルパー関数
+ * 获取多语言消息的辅助函数
  *
- * @param messages 言語別メッセージオブジェクト
- * @param key メッセージキー
- * @param args メッセージに渡す引数（パラメータ化メッセージ用）
- * @returns ローカライズされたメッセージ
+ * @param messages 按语言划分的消息对象
+ * @param key 消息键
+ * @param args 传递给消息的参数（用于参数化消息）
+ * @returns 本地化后的消息
  *
  * @example
  * ```typescript
  * const messages = {
  *   en: { greeting: 'Hello', error: (code: number) => `Error ${code}` },
- *   ja: { greeting: 'こんにちは', error: (code: number) => `エラー ${code}` }
+ *   zh: { greeting: '你好', error: (code: number) => `错误 ${code}` }
  * };
  *
- * t(messages, 'greeting'); // 'Hello' または 'こんにちは'
- * t(messages, 'error', 404); // 'Error 404' または 'エラー 404'
+ * t(messages, 'greeting'); // 'Hello' 或 '你好'
+ * t(messages, 'error', 404); // 'Error 404' 或 '错误 404'
  * ```
  */
 export function t(
@@ -106,7 +110,7 @@ export function t(
   const message = messages[locale]?.[key];
 
   if (!message) {
-    // フォールバック: キーが見つからない場合は英語を試す
+    // 回退机制：如果找不到对应语言的键，尝试英语
     const fallbackMessage = messages["en"]?.[key];
     if (!fallbackMessage) {
       return `[Missing translation: ${key}]`;
@@ -120,14 +124,14 @@ export function t(
 }
 
 /**
- * 複数のメッセージを一度に取得するヘルパー
+ * 一次性获取多个消息的辅助函数
  */
 export function createTranslator(messages: LocaleMessages) {
   return (key: string, ...args: any[]): string => t(messages, key, ...args);
 }
 
 /**
- * 言語設定の初期化（サーバー起動時に呼び出し）
+ * 初始化语言设置（在服务器启动时调用）
  */
 export function initializeLocale(locale?: SupportedLocale): void {
   if (locale) {
@@ -138,14 +142,14 @@ export function initializeLocale(locale?: SupportedLocale): void {
 }
 
 /**
- * 現在の言語を取得する便利関数
+ * 获取当前语言的便捷函数
  */
 export function getCurrentLocale(): SupportedLocale {
   return localeManager.getLocale();
 }
 
 /**
- * 言語を変更する便利関数
+ * 修改语言的便捷函数
  */
 export function setLocale(locale: SupportedLocale): void {
   localeManager.setLocale(locale);

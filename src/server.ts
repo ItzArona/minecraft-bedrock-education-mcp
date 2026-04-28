@@ -8,7 +8,7 @@ import {
   ToolCallResult,
 } from "./types";
 
-// Advanced Building ツール
+// 高级建筑工具
 import { BuildCubeTool } from "./tools/advanced/building/build-cube";
 import { BuildLineTool } from "./tools/advanced/building/build-line";
 import { BuildSphereTool } from "./tools/advanced/building/build-sphere";
@@ -22,7 +22,7 @@ import { BuildRotateTool } from "./tools/advanced/building/build-rotate";
 import { BuildTransformTool } from "./tools/advanced/building/build-transform";
 import { BuildBezierTool } from "./tools/advanced/building/build-bezier";
 
-// Socket-BE Core API ツール（推奨）
+// Socket-BE 核心 API 工具（推荐）
 import { AgentTool } from "./tools/core/agent";
 import { WorldTool } from "./tools/core/world";
 import { PlayerTool } from "./tools/core/player";
@@ -33,7 +33,8 @@ import { SequenceTool } from "./tools/core/sequence";
 import { MinecraftWikiTool } from "./tools/core/minecraft-wiki";
 
 import { BaseTool } from "./tools/base/tool";
-import { initializeLocale, SupportedLocale } from "./utils/i18n/locale-manager";
+import { initializeLocale, SupportedLocale, t } from "./utils/i18n/locale-manager";
+import { CORE_MESSAGES } from "./utils/i18n/server-messages";
 import {
   optimizeBuildResult,
   optimizeCommandResult,
@@ -43,26 +44,26 @@ import { SchemaToZodConverter } from "./utils/schema-converter";
 import { enrichErrorWithHints } from "./utils/error-hints";
 
 /**
- * Minecraft Bedrock Edition用MCPサーバー
+ * Minecraft 基岩版 MCP 服务器
  *
- * WebSocket接続を通じてMinecraft Bedrock Editionを制御し、
- * MCP（Model Context Protocol）プロトコルを実装して
- * AIクライアント（Claude Desktopなど）との統合を提供します。
+ * 通过 WebSocket 连接控制 Minecraft 基岩版 (Bedrock Edition) 和 教育版 (Education Edition)，
+ * 实现 MCP (Model Context Protocol) 协议，
+ * 提供与 AI 客户端（如 Claude Desktop）的集成。
  *
  * @description
- * このサーバーは以下の機能を提供します：
- * - WebSocket経由でのMinecraft Bedrock Edition接続
- * - MCP 2.0プロトコル準拠のAIクライアント統合
- * - 15種類の階層化ツール（基本操作・複合操作）
- * - プレイヤー、エージェント、ワールド、建築制御
+ * 该服务器提供以下功能：
+ * - 通过 WebSocket 连接 Minecraft 基岩版
+ * - 符合 MCP 2.0 协议的 AI 客户端集成
+ * - 15 种分层工具（基础操作、复合操作）
+ * - 玩家、代理 (Agent)、世界、建筑控制
  *
  * @example
  * ```typescript
- * // サーバーの起動
+ * // 启动服务器
  * const server = new MinecraftMCPServer();
  * server.start(8001);
  *
- * // Minecraftから接続: /connect localhost:8001/ws
+ * // 从 Minecraft 连接: /connect localhost:8001/ws
  * ```
  *
  * @since 1.0.0
@@ -79,7 +80,7 @@ export class MinecraftMCPServer {
   private mcpServer: McpServer;
 
   constructor() {
-    // MCP公式SDKのサーバーを初期化
+    // 初始化 MCP 官方 SDK 服务器
     this.mcpServer = new McpServer(
       {
         name: "minecraft-bedrock-education-mcp",
@@ -94,75 +95,73 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * MCPサーバーを起動します
+   * 启动 MCP 服务器
    *
-   * WebSocketサーバーとMCPインターフェースを初期化し、
-   * Minecraftクライアントとの接続を待機します。
+   * 初始化 WebSocket 服务器和 MCP 接口，
+   * 等待来自 Minecraft 客户端的连接。
    *
-   * @param port - WebSocketサーバーのポート番号（デフォルト: 8001）
-   * @throws WebSocketサーバーの起動に失敗した場合
+   * @param port - WebSocket 服务器端口号（默认：8001）
+   * @throws 启动 WebSocket 服务器失败时抛出异常
    *
    * @example
    * ```typescript
    * const server = new MinecraftMCPServer();
-   * server.start(8001); // ポート8001で起動
+   * server.start(8001); // 在 8001 端口启动
    *
-   * // Minecraftから接続:
+   * // 从 Minecraft 连接：
    * // /connect localhost:8001/ws
    * ```
    */
   public async start(port: number = 8001, locale?: SupportedLocale): Promise<void> {
-    // 言語設定を初期化
+    // 初始化语言设置
     initializeLocale(locale);
 
-    // MCP及びツールの初期化
+    // 初始化 MCP 及其工具
     await this.setupMCPServer();
 
-    // Socket-BEサーバーの起動
+    // 启动 Socket-BE 服务器
     this.setupSocketBEServer(port);
 
-    // イベントハンドラーの登録
+    // 注册事件处理程序
     this.setupEventHandlers();
   }
 
   /**
-   * MCPサーバーとツールを初期化
+   * 初始化 MCP 服务器和工具
    * @private
    */
   private async setupMCPServer(): Promise<void> {
-    // ツールの初期化
+    // 初始化工具
     this.initializeTools();
 
-    // 基本ツールの登録
+    // 注册基础工具
     this.registerBasicTools();
 
-    // モジュラーツールの登録
+    // 注册模块化工具
     this.registerModularTools();
 
-    // MCP Stdio Transportに接続
+    // 连接到 MCP Stdio 传输层
     const transport = new StdioServerTransport();
     await this.mcpServer.connect(transport);
   }
 
   /**
-   * Socket-BEサーバーを起動
+   * 启动 Socket-BE 服务器
    * @private
    */
   private setupSocketBEServer(port: number): void {
-    // Socket-BE Minecraftサーバーを起動
+    // 启动 Socket-BE Minecraft 服务器
     this.socketBE = new SocketBE({ port });
 
-    // MCPモードでない場合のみstderrにログ出力
+    // 仅在非 MCP 模式（有 TTY）时输出日志到 stderr
     if (process.stdin.isTTY !== false) {
-      console.error(
-        `SocketBE Minecraft WebSocketサーバーを起動中 ポート:${port}`
-      );
-      console.error(`Minecraftから接続: /connect localhost:${port}/ws`);
+      console.error(t(CORE_MESSAGES, "SERVER_STARTING", port));
+      console.error(t(CORE_MESSAGES, "CONNECT_COMMAND", port));
     }
   }
 
   /**
-   * Socket-BEイベントハンドラーを登録
+   * 注册 Socket-BE 事件处理程序
    * @private
    */
   private setupEventHandlers(): void {
@@ -182,23 +181,23 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * サーバーOpen時の処理
+   * 服务器开启时的处理
    * @private
    */
   private handleServerOpen(): void {
     if (process.stdin.isTTY !== false) {
-      console.error("SocketBEサーバーが開始されました");
+      console.error(t(CORE_MESSAGES, "SERVER_STARTED"));
     }
 
-    // 10秒後に強制的にワールドとエージェントを設定
+    // 10 秒后强制设置世界和代理
     this.scheduleWorldInitialization(10000);
 
-    // 定期的なワールドチェック（30秒ごと）
+    // 定期检查世界（每 30 秒）
     this.startPeriodicWorldCheck(30000);
   }
 
   /**
-   * ワールド初期化をスケジュール
+   * 调度世界初始化
    * @private
    */
   private scheduleWorldInitialization(delayMs: number): void {
@@ -207,16 +206,16 @@ export class MinecraftMCPServer {
         const worlds = this.socketBE?.worlds;
         if (worlds && worlds instanceof Map && worlds.size > 0) {
           await this.initializeWorld(Array.from(worlds.values())[0]);
-          await this.sendWorldMessage("§a[MCP Server] 接続完了！AIツールが利用可能になりました。");
+          await this.sendWorldMessage(t(CORE_MESSAGES, "CONNECTION_COMPLETE"));
         }
       } catch (error) {
-        // 強制設定失敗は無視してサーバー継続
+        // 强制设置失败时忽略，继续运行服务器
       }
     }, delayMs);
   }
 
   /**
-   * 定期的なワールドチェックを開始
+   * 开始定期检查世界
    * @private
    */
   private startPeriodicWorldCheck(intervalMs: number): void {
@@ -225,28 +224,28 @@ export class MinecraftMCPServer {
         const worlds = this.socketBE.worlds;
         if (worlds instanceof Map && worlds.size > 0) {
           await this.initializeWorld(Array.from(worlds.values())[0]);
-          await this.sendWorldMessage("§a[MCP Server] 遅延接続完了！AIツールが利用可能になりました。");
+          await this.sendWorldMessage(t(CORE_MESSAGES, "DELAYED_CONNECTION"));
         }
       }
     }, intervalMs);
   }
 
   /**
-   * ワールドとエージェントを初期化し、ツールに設定
+   * 初始化世界和代理，并配置给工具
    * @private
    */
   private async initializeWorld(world: World): Promise<void> {
     this.currentWorld = world;
 
-    // エージェントを取得
+    // 获取代理 (Agent)
     try {
       this.currentAgent = await this.currentWorld.getOrCreateAgent();
     } catch (agentError) {
-      // エージェント取得に失敗してもサーバーは継続
+      // 获取代理失败时也继续运行服务器
       this.currentAgent = null;
     }
 
-    // 仮のプレイヤー情報を設定
+    // 设置临时玩家信息
     if (!this.connectedPlayer) {
       this.connectedPlayer = {
         ws: null,
@@ -255,12 +254,12 @@ export class MinecraftMCPServer {
       };
     }
 
-    // 全ツールにSocket-BEインスタンスを設定
+    // 更新所有工具的 Socket-BE 实例
     this.updateToolsWithWorldInstances();
   }
 
   /**
-   * 全ツールにワールドとエージェントを設定
+   * 为所有工具设置世界和代理实例
    * @private
    */
   private updateToolsWithWorldInstances(): void {
@@ -270,40 +269,38 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * ワールドにメッセージを送信（エラー無視）
+   * 向世界发送消息（忽略错误）
    * @private
    */
   private async sendWorldMessage(message: string): Promise<void> {
     try {
       await this.currentWorld?.sendMessage(message);
     } catch (messageError) {
-      // メッセージ送信失敗は無視
+      // 消息发送失败时忽略
     }
   }
 
   /**
-   * プレイヤー参加時の処理
+   * 玩家加入时的处理
    * @private
    */
   private async handlePlayerJoin(ev: any): Promise<void> {
     if (process.stdin.isTTY !== false) {
-      console.error("新しいプレイヤーが参加しました:", ev.player.name);
+      console.error(t(CORE_MESSAGES, "PLAYER_JOINED", ev.player.name));
     }
 
-    // Minecraft側に参加確認メッセージを送信
-    await this.sendWorldMessage(
-      `§b[MCP Server] §f${ev.player.name}さん、ようこそ！AIアシスタントが利用可能です。`
-    );
+    // 向 Minecraft 发送加入确认消息
+    await this.sendWorldMessage(t(CORE_MESSAGES, "WELCOME_MESSAGE", ev.player.name));
 
     this.connectedPlayer = {
-      ws: null, // SocketBEではws直接アクセス不要
+      ws: null, // SocketBE 中不需要直接访问 ws
       name: ev.player.name || "unknown",
       id: uuidv4(),
     };
 
     this.currentWorld = ev.world;
 
-    // エージェントを取得
+    // 获取代理 (Agent)
     try {
       if (this.currentWorld) {
         this.currentAgent = await this.currentWorld.getOrCreateAgent();
@@ -313,40 +310,40 @@ export class MinecraftMCPServer {
       this.currentAgent = null;
     }
 
-    // 全ツールのSocket-BEインスタンスを更新
+    // 更新所有工具的 Socket-BE 实例
     this.updateToolsWithWorldInstances();
   }
 
   /**
-   * プレイヤー退出時の処理
+   * 玩家退出时的处理
    * @private
    */
   private handlePlayerLeave(ev: any): void {
     if (process.stdin.isTTY !== false) {
-      console.error(`プレイヤーが切断されました: ${ev.player.name}`);
+      console.error(t(CORE_MESSAGES, "PLAYER_LEFT", ev.player.name));
     }
 
     this.connectedPlayer = null;
     this.currentWorld = null;
     this.currentAgent = null;
 
-    // 全ツールのSocket-BEインスタンスをクリア
+    // 清除所有工具的 Socket-BE 实例
     this.tools.forEach((tool) => {
       tool.setSocketBEInstances(null, null);
     });
   }
 
   /**
-   * 利用可能なツールを初期化します
+   * 初始化可用工具
    *
-   * Level 1（基本操作）とLevel 2（複合操作）のツールを登録し、
-   * 各ツールにコマンド実行関数を注入します。
+   * 注册 Level 1（基础操作）和 Level 2（复合操作）的工具，
+   * 为每个工具注入命令执行函数。
    *
    * @internal
    */
   private initializeTools(): void {
     this.tools = [
-      // Socket-BE Core API ツール（推奨 - シンプルでAI使いやすい）
+      // Socket-BE 核心 API 工具（推荐 - 简洁且 AI 易用）
       new AgentTool(),
       new WorldTool(),
       new PlayerTool(),
@@ -356,22 +353,22 @@ export class MinecraftMCPServer {
       new SequenceTool(),
       new MinecraftWikiTool(),
 
-      // Advanced Building ツール（高レベル建築機能）
-      new BuildCubeTool(), // ✅ 完全動作
-      new BuildLineTool(), // ✅ 完全動作
-      new BuildSphereTool(), // ✅ 完全動作
-      new BuildCylinderTool(), // ✅ 修正済み
-      new BuildParaboloidTool(), // ✅ 基本動作
-      new BuildHyperboloidTool(), // ✅ 基本動作
-      new BuildRotateTool(), // ✅ 基本動作
-      new BuildTransformTool(), // ✅ 基本動作
-      new BuildTorusTool(), // ✅ 修正完了
-      new BuildHelixTool(), // ✅ 修正完了
-      new BuildEllipsoidTool(), // ✅ 修正完了
-      new BuildBezierTool(), // ✅ 新規追加（可変制御点ベジェ曲線）
+      // 高级建筑工具（高级建筑功能）
+      new BuildCubeTool(), // ✅ 运行正常
+      new BuildLineTool(), // ✅ 运行正常
+      new BuildSphereTool(), // ✅ 运行正常
+      new BuildCylinderTool(), // ✅ 已修复
+      new BuildParaboloidTool(), // ✅ 基本可用
+      new BuildHyperboloidTool(), // ✅ 基本可用
+      new BuildRotateTool(), // ✅ 基本可用
+      new BuildTransformTool(), // ✅ 基本可用
+      new BuildTorusTool(), // ✅ 已修复
+      new BuildHelixTool(), // ✅ 已修复
+      new BuildEllipsoidTool(), // ✅ 已修复
+      new BuildBezierTool(), // ✅ 新增（多控制点贝塞尔曲线）
     ];
 
-    // 全ツールにコマンド実行関数とSocket-BEインスタンスを設定
+    // 为所有工具设置命令执行函数和 Socket-BE 实例
     const commandExecutor = async (
       command: string
     ): Promise<ToolCallResult> => {
@@ -383,7 +380,7 @@ export class MinecraftMCPServer {
       tool.setSocketBEInstances(this.currentWorld, this.currentAgent);
     });
 
-    // SequenceToolにツールレジストリを設定
+    // 为 SequenceTool 设置工具注册表
     const sequenceTool = this.tools.find(
       (tool) => tool.name === "sequence"
     ) as SequenceTool;
@@ -397,10 +394,10 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * MCP SDKに基本ツールを登録
+   * 在 MCP SDK 中注册基础工具
    */
   private registerBasicTools(): void {
-    // send_message ツール
+    // send_message 工具
     this.mcpServer.registerTool(
       "send_message",
       {
@@ -422,7 +419,7 @@ export class MinecraftMCPServer {
         if (result.success) {
           responseText = result.message || "Message sent successfully";
         } else {
-          // エラーメッセージにヒントを追加
+          // 在错误消息中添加提示
           const errorMsg = result.message || "Failed to send message";
           responseText = `❌ ${enrichErrorWithHints(errorMsg)}`;
         }
@@ -438,7 +435,7 @@ export class MinecraftMCPServer {
       }
     );
 
-    // execute_command ツール
+    // execute_command 工具
     this.mcpServer.registerTool(
       "execute_command",
       {
@@ -451,7 +448,7 @@ export class MinecraftMCPServer {
       async ({ command }: { command: string }) => {
         const result = await this.executeCommand(command);
 
-        // トークン最適化: コマンド結果を要約
+        // Token 优化：总结命令执行结果
         const optimized = optimizeCommandResult(result.data);
 
         let responseText: string;
@@ -461,13 +458,13 @@ export class MinecraftMCPServer {
             responseText += `\n\n${JSON.stringify(optimized.details, null, 2)}`;
           }
         } else {
-          // エラーメッセージにヒントを追加
+          // 在错误消息中添加提示
           const errorMsg = result.message || "Command execution failed";
           const enrichedError = enrichErrorWithHints(errorMsg);
           responseText = `❌ ${enrichedError}`;
         }
 
-        // レスポンスサイズチェック
+        // 检查响应大小
         const sizeWarning = checkResponseSize(responseText);
         if (sizeWarning) {
           responseText += `\n\n${sizeWarning}`;
@@ -486,16 +483,16 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * MCP SDKにモジュラーツールを登録
+   * 在 MCP SDK 中注册模块化工具
    */
   private registerModularTools(): void {
     const schemaConverter = new SchemaToZodConverter();
 
     this.tools.forEach((tool) => {
-      // inputSchemaをZod形式に変換（SchemaToZodConverterを使用）
+      // 使用 SchemaToZodConverter 将 inputSchema 转换为 Zod 格式
       const zodSchema = schemaConverter.convert(tool.inputSchema);
 
-      // ツールを登録
+      // 注册工具
       this.mcpServer.registerTool(
         tool.name,
         {
@@ -510,7 +507,7 @@ export class MinecraftMCPServer {
             let responseText: string;
 
             if (result.success) {
-              // 建築ツールの場合は最適化
+              // 建筑工具结果优化
               if (tool.name.startsWith('build_')) {
                 const optimized = optimizeBuildResult(result);
                 responseText = `✅ ${optimized.message}`;
@@ -518,15 +515,15 @@ export class MinecraftMCPServer {
                   responseText += `\n\n📊 Summary:\n${JSON.stringify(optimized.summary, null, 2)}`;
                 }
               } else {
-                // 通常ツールの場合
+                // 通用工具结果
                 responseText = result.message || `Tool ${tool.name} executed successfully`;
                 if (result.data) {
-                  // データサイズチェック
+                  // 检查数据大小
                   const dataStr = JSON.stringify(result.data, null, 2);
                   const sizeWarning = checkResponseSize(dataStr);
 
                   if (sizeWarning) {
-                    // 大きすぎる場合はデータタイプのみ表示
+                    // 数据过大时仅显示类型
                     responseText += `\n\n${sizeWarning}`;
                     responseText += `\nData type: ${Array.isArray(result.data) ? `Array[${result.data.length}]` : typeof result.data}`;
                   } else {
@@ -535,7 +532,7 @@ export class MinecraftMCPServer {
                 }
               }
             } else {
-              // エラーメッセージにヒントを追加
+              // 在错误消息中添加提示
               const errorMsg = result.message || "Tool execution failed";
               const enrichedError = enrichErrorWithHints(errorMsg);
               responseText = `❌ ${enrichedError}`;
@@ -576,54 +573,54 @@ export class MinecraftMCPServer {
   private lastCommandResponse: any = null;
 
   /**
-   * 接続中のMinecraftプレイヤーにメッセージを送信します
+   * 向连接的 Minecraft 玩家发送消息
    *
-   * @param text - 送信するメッセージテキスト
-   * @returns 送信結果
+   * @param text - 要发送的消息文本
+   * @returns 发送结果
    *
    * @example
    * ```typescript
    * const result = server.sendMessage("Hello, Minecraft!");
    * if (result.success) {
-   *   console.log("メッセージ送信成功");
+   *   console.log("消息发送成功");
    * }
    * ```
    */
   public async sendMessage(text: string): Promise<ToolCallResult> {
     if (!this.currentWorld) {
       if (process.stdin.isTTY !== false) {
-        console.error("エラー: プレイヤーが接続されていません");
+        console.error(t(CORE_MESSAGES, "PLAYER_NOT_CONNECTED"));
       }
       return { success: false, message: "No player connected" };
     }
 
     try {
       if (process.stdin.isTTY !== false) {
-        console.error(`メッセージ送信: ${text}`);
+        console.error(t(CORE_MESSAGES, "SENDING_MESSAGE", text));
       }
 
       await this.currentWorld.sendMessage(text);
       return { success: true, message: "Message sent successfully" };
     } catch (error) {
       if (process.stdin.isTTY !== false) {
-        console.error("メッセージ送信エラー:", error);
+        console.error(t(CORE_MESSAGES, "MESSAGE_SEND_ERROR"), error);
       }
       return { success: false, message: `Failed to send message: ${error}` };
     }
   }
 
   /**
-   * Minecraftコマンドを実行します
+   * 执行 Minecraft 命令
    *
-   * @param command - 実行するMinecraftコマンド（"/"プレフィックスなし）
-   * @returns コマンド実行結果
+   * @param command - 要执行的 Minecraft 命令（无需 "/" 前缀）
+   * @returns 命令执行结果
    *
    * @example
    * ```typescript
-   * // プレイヤーをテレポート
+   * // 传送玩家
    * server.executeCommand("tp @p 100 64 200");
    *
-   * // ブロックを設置
+   * // 放置方块
    * server.executeCommand("setblock 0 64 0 minecraft:stone");
    * ```
    */
@@ -635,7 +632,7 @@ export class MinecraftMCPServer {
     try {
       const result = await this.currentWorld.runCommand(command);
 
-      // レスポンスをlastCommandResponseに保存（位置情報取得などで使用）
+      // 将响应保存到 lastCommandResponse（用于获取位置信息等）
       this.lastCommandResponse = result;
 
       return {
@@ -652,19 +649,19 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * 最新のコマンドレスポンスを取得します（位置情報など）
+   * 获取最新的命令响应（例如位置信息）
    */
   public getLastCommandResponse(): any {
     return this.lastCommandResponse;
   }
 }
 
-// サーバーを開始
+// 启动服务器
 const server = new MinecraftMCPServer();
 
-// ポート番号をコマンドライン引数から取得
+// 从命令行参数获取端口号
 const getPort = (): number => {
-  // コマンドライン引数から取得 (--port=8002)
+  // 从命令行参数获取 (--port=8002)
   const portArg = process.argv.find((arg) => arg.startsWith("--port="));
   if (portArg) {
     const port = parseInt(portArg.split("=")[1]);
@@ -673,22 +670,22 @@ const getPort = (): number => {
     }
   }
 
-  // デフォルト値
+  // 默认值
   return 8001;
 };
 
-// 言語設定をコマンドライン引数から取得
+// 从命令行参数获取语言设置
 const getLocale = (): SupportedLocale | undefined => {
-  // コマンドライン引数から取得 (--lang=ja または --lang=en)
+  // 从命令行参数获取 (--lang=ja, --lang=en 或 --lang=zh)
   const langArg = process.argv.find((arg) => arg.startsWith("--lang="));
   if (langArg) {
     const lang = langArg.split("=")[1];
-    if (lang === "ja" || lang === "en") {
-      return lang;
+    if (lang === "ja" || lang === "en" || lang === "zh") {
+      return lang as SupportedLocale;
     }
   }
 
-  // デフォルトは自動検出（undefined）
+  // 默认自动检测 (undefined)
   return undefined;
 };
 

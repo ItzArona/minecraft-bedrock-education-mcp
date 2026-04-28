@@ -1,6 +1,6 @@
 # Minecraft Bedrock MCP Server
 
-[日本語版 README はこちら / Japanese README here](README_ja.md)
+[日本語版 README はこちら / Japanese README here](README_ja.md) | [中文版 README 点这里 / Chinese README here](README_zh.md)
 
 A TypeScript-based MCP server for controlling Minecraft Bedrock Edition and Education Edition.
 
