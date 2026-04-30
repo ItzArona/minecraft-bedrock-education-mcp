@@ -8,7 +8,7 @@ import { AgentDirection } from 'socket-be';
  */
 export class AgentTool extends BaseTool {
     readonly name = 'agent';
-    readonly description = 'Agent automation: move/turn/teleport agent, mine/place blocks, inventory management, item collection/dropping, block inspection. Perfect for automated building, resource gathering, exploration. Actions: move(forward/back/left/right), teleport(coordinates), mine_block(direction), place_block(slot+direction), get_inventory, collect_item, attack';
+    readonly description = 'Agent automation: move/turn/teleport agent, mine/place blocks, inventory management, item collection/dropping, block inspection. Perfect for automated building, resource gathering, exploration. Actions: move(forward/back/left/right), teleport(coordinates), mine_block(direction), place_block(slot+direction), get_inventory(optional slot for one slot; omit slot for all 16 slots), collect_item, attack';
     
     readonly inputSchema: InputSchema = {
         type: 'object',
@@ -39,7 +39,7 @@ export class AgentTool extends BaseTool {
             z: { type: 'number', description: 'Z coordinate for teleportation' },
             slot: {
                 type: 'number',
-                description: 'Inventory slot (1-16)',
+                description: 'Inventory slot (1-16). Optional for get_inventory; omit to inspect all 16 slots.',
                 minimum: 1,
                 maximum: 16
             },
@@ -200,12 +200,10 @@ export class AgentTool extends BaseTool {
                     break;
 
                 case 'get_inventory':
-                    if (!args.slot) return { success: false, message: 'Slot required for get_inventory' };
-                    const itemDetail = await this.agent.getItemDetail(args.slot);
-                    const itemCount = await this.agent.getItemCount(args.slot);
-                    const itemSpace = await this.agent.getItemSpace(args.slot);
-                    result = { detail: itemDetail, count: itemCount, space: itemSpace };
-                    message = `Inventory info for slot ${args.slot} retrieved`;
+                    result = await this.getInventory(args.slot);
+                    message = args.slot
+                        ? `Inventory info for slot ${args.slot} retrieved`
+                        : 'Inventory info for all slots retrieved';
                     break;
 
                 case 'set_item_in_slot':
@@ -238,6 +236,27 @@ export class AgentTool extends BaseTool {
                 message: `Agent operation error: ${error instanceof Error ? error.message : String(error)}`
             };
         }
+    }
+
+    private async getInventory(slot?: number): Promise<any> {
+        if (slot) {
+            return await this.getSlotInventory(slot);
+        }
+
+        const slots: Record<string, any> = {};
+        for (let currentSlot = 1; currentSlot <= 16; currentSlot++) {
+            slots[currentSlot] = await this.getSlotInventory(currentSlot);
+        }
+
+        return { slots };
+    }
+
+    private async getSlotInventory(slot: number): Promise<any> {
+        const itemDetail = await this.agent!.getItemDetail(slot);
+        const itemCount = await this.agent!.getItemCount(slot);
+        const itemSpace = await this.agent!.getItemSpace(slot);
+
+        return { detail: itemDetail, count: itemCount, space: itemSpace };
     }
 
     /**

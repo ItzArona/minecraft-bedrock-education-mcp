@@ -7,7 +7,7 @@ import { ToolCallResult, InputSchema } from '../../types';
  */
 export class SystemTool extends BaseTool {
     readonly name = 'system';
-    readonly description = 'System features: scoreboards (create/edit/delete objectives), screen displays (titles/subtitles/action_bars), player UI notifications. Actions: scoreboard_create/edit/delete, title_show(big_text), subtitle_show(small_text), actionbar_show(bottom_message). Perfect for displaying game stats, notifications, or creating UI elements';
+    readonly description = 'System features: scoreboards (create/edit/delete objectives), screen displays (titles/subtitles/action_bars), player UI notifications. Actions: scoreboard list/create/remove/get/set/add/reset/display; screen show_title/title_show, update_subtitle/subtitle_show, show_action_bar/actionbar_show, clear_title, reset_title. Perfect for displaying game stats, notifications, or creating UI elements';
     
     readonly inputSchema: InputSchema = {
         type: 'object',
@@ -19,7 +19,7 @@ export class SystemTool extends BaseTool {
             },
             action: {
                 type: 'string',
-                description: 'Action to perform within the category'
+                description: 'Action to perform within the category. Screen aliases title_show/actionbar_show/subtitle_show are accepted for show_title/show_action_bar/update_subtitle.'
             },
             // Scoreboard parameters
             objective_id: {
@@ -252,6 +252,8 @@ export class SystemTool extends BaseTool {
     }
 
     private async executeScreenOperation(action: string, args: any): Promise<ToolCallResult> {
+        const normalizedAction = this.normalizeScreenAction(action);
+
         // Get target player
         let player = this.world!.localPlayer;
         if (args.player_name) {
@@ -272,7 +274,7 @@ export class SystemTool extends BaseTool {
         let message: string;
         let result: any;
 
-        switch (action) {
+        switch (normalizedAction) {
             case 'show_title':
                 if (!args.title) return { success: false, message: 'title required for show_title' };
                 const titleOptions = {
@@ -334,8 +336,19 @@ export class SystemTool extends BaseTool {
         return {
             success: true,
             message: message,
-            data: { category: 'screen', action, result, targetPlayer: player.name, timestamp: Date.now() }
+            data: { category: 'screen', action: normalizedAction, requestedAction: action, result, targetPlayer: player.name, timestamp: Date.now() }
         };
+    }
+
+    private normalizeScreenAction(action: string): string {
+        const aliases: Record<string, string> = {
+            title_show: 'show_title',
+            subtitle_show: 'update_subtitle',
+            actionbar_show: 'show_action_bar',
+            action_bar_show: 'show_action_bar'
+        };
+
+        return aliases[action] || action;
     }
 
     /**
