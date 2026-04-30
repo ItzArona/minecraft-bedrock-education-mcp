@@ -63,7 +63,7 @@ import { enrichErrorWithHints } from "./utils/error-hints";
  * const server = new MinecraftMCPServer();
  * server.start(8001);
  *
- * // 从 Minecraft 连接: /connect localhost:8001/ws
+ * // 从 Minecraft 连接: /connect "localhost:8001/ws"
  * ```
  *
  * @since 1.0.0
@@ -109,7 +109,7 @@ export class MinecraftMCPServer {
    * server.start(8001); // 在 8001 端口启动
    *
    * // 从 Minecraft 连接：
-   * // /connect localhost:8001/ws
+   * // /connect "localhost:8001/ws"
    * ```
    */
   public async start(port: number = 8001, locale?: SupportedLocale): Promise<void> {
@@ -151,13 +151,63 @@ export class MinecraftMCPServer {
    */
   private setupSocketBEServer(port: number): void {
     // 启动 Socket-BE Minecraft 服务器
-    this.socketBE = new SocketBE({ port });
+    this.socketBE = new SocketBE({ port, disableEncryption: true });
+    this.patchSocketBEWorldCommands("1.26.10");
 
     // 仅在非 MCP 模式（有 TTY）时输出日志到 stderr
     if (process.stdin.isTTY !== false) {
       console.error(t(CORE_MESSAGES, "SERVER_STARTING", port));
       console.error(t(CORE_MESSAGES, "CONNECT_COMMAND", port));
     }
+  }
+
+  private patchSocketBEWorldCommands(minecraftVersion: string): void {
+    const worlds = (this.socketBE as any)?.worlds;
+    const originalSet = worlds?.set?.bind(worlds);
+    if (!worlds || !originalSet || (worlds as any).__mcpPatched) return;
+
+    (worlds as any).__mcpPatched = true;
+
+    worlds.set = (connection: any, world: any) => {
+      const originalRunCommand = world.runCommand?.bind(world);
+
+      if (originalRunCommand) {
+        world.runCommand = async (command: string, options?: any) => {
+          const requestId = uuidv4();
+          const body: Record<string, unknown> = {
+            commandLine: command,
+            origin: { type: "player" }
+          };
+
+          const version = options?.minecraftVersion ?? minecraftVersion;
+          if (typeof version === "string" && version.trim().length > 0) {
+            body.version = version;
+          }
+
+          const payload = JSON.stringify({
+            header: {
+              version: 1,
+              requestId,
+              messageType: "commandRequest",
+              messagePurpose: "commandRequest"
+            },
+            body
+          });
+
+          if (options?.noResponse) {
+            world.connection.send(payload);
+            return { statusCode: 0, statusMessage: "" };
+          }
+
+          const pendingResponse = world.connection.awaitResponse(requestId, options?.timeout);
+          world.connection.send(payload);
+          const response = await pendingResponse;
+          return response.toCommandResult();
+        };
+      }
+
+      return originalSet(connection, world);
+    };
   }
 
   /**
@@ -206,7 +256,6 @@ export class MinecraftMCPServer {
         const worlds = this.socketBE?.worlds;
         if (worlds && worlds instanceof Map && worlds.size > 0) {
           await this.initializeWorld(Array.from(worlds.values())[0]);
-          await this.sendWorldMessage(t(CORE_MESSAGES, "CONNECTION_COMPLETE"));
         }
       } catch (error) {
         // 强制设置失败时忽略，继续运行服务器
@@ -224,7 +273,6 @@ export class MinecraftMCPServer {
         const worlds = this.socketBE.worlds;
         if (worlds instanceof Map && worlds.size > 0) {
           await this.initializeWorld(Array.from(worlds.values())[0]);
-          await this.sendWorldMessage(t(CORE_MESSAGES, "DELAYED_CONNECTION"));
         }
       }
     }, intervalMs);
@@ -237,13 +285,8 @@ export class MinecraftMCPServer {
   private async initializeWorld(world: World): Promise<void> {
     this.currentWorld = world;
 
-    // 获取代理 (Agent)
-    try {
-      this.currentAgent = await this.currentWorld.getOrCreateAgent();
-    } catch (agentError) {
-      // 获取代理失败时也继续运行服务器
-      this.currentAgent = null;
-    }
+    // 不在连接初始化时自动创建 agent，避免在某些环境里因权限问题打断连接。
+    this.currentAgent = null;
 
     // 设置临时玩家信息
     if (!this.connectedPlayer) {
@@ -269,18 +312,6 @@ export class MinecraftMCPServer {
   }
 
   /**
-   * 向世界发送消息（忽略错误）
-   * @private
-   */
-  private async sendWorldMessage(message: string): Promise<void> {
-    try {
-      await this.currentWorld?.sendMessage(message);
-    } catch (messageError) {
-      // 消息发送失败时忽略
-    }
-  }
-
-  /**
    * 玩家加入时的处理
    * @private
    */
@@ -288,9 +319,6 @@ export class MinecraftMCPServer {
     if (process.stdin.isTTY !== false) {
       console.error(t(CORE_MESSAGES, "PLAYER_JOINED", ev.player.name));
     }
-
-    // 向 Minecraft 发送加入确认消息
-    await this.sendWorldMessage(t(CORE_MESSAGES, "WELCOME_MESSAGE", ev.player.name));
 
     this.connectedPlayer = {
       ws: null, // SocketBE 中不需要直接访问 ws
@@ -300,15 +328,7 @@ export class MinecraftMCPServer {
 
     this.currentWorld = ev.world;
 
-    // 获取代理 (Agent)
-    try {
-      if (this.currentWorld) {
-        this.currentAgent = await this.currentWorld.getOrCreateAgent();
-      }
-    } catch (error) {
-      console.error("Failed to get or create agent:", error);
-      this.currentAgent = null;
-    }
+    this.currentAgent = null;
 
     // 更新所有工具的 Socket-BE 实例
     this.updateToolsWithWorldInstances();

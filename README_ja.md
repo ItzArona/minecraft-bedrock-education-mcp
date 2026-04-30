@@ -32,7 +32,7 @@ npm start
 
 Minecraftでワールドを開き（チート有効）、チャット欄で：
 ```
-/connect localhost:8001/ws
+/connect "localhost:8001/ws"
 ```
 
 ### 3. AIアシスタント設定
@@ -69,7 +69,7 @@ MCPクライアント（Claude Desktop等）の設定ファイルに追加：
 
 `plugins/mcp_cmdblock_bridge/` は任意で導入できる LeviLamina / LegacyScriptEngine QuickJS プラグインです。MCP からコマンドブロックの `Command` NBT フィールドを書き込めるようにします。通常の Bedrock コマンドではコマンドブロック内部のコマンドを直接書き込めないため、このプラグインを有効にした後は `blocks` ツールで `action: "set_command_block"` を使用してください。
 
-`plugins/mcp_cmdblock_bridge/` フォルダー全体を LeviLamina / LegacyScriptEngine のプラグイン読み込みディレクトリに配置し、サーバーを再起動します。MCP 側は従来どおり WebSocket に接続します。`blocks` を呼び出す際は `action: "set_command_block"`、`x/y/z`、`command`、必要に応じて `dimid`（`0` オーバーワールド、`1` ネザー、`2` エンド）を指定します。
+`plugins/mcp_cmdblock_bridge/` フォルダー全体を LeviLamina / LegacyScriptEngine のプラグイン読み込みディレクトリに配置し、サーバーを再起動します。MCP 側は従来どおり WebSocket に接続します。`blocks` を呼び出す際は `action: "set_command_block"`、`x/y/z`、`command`、必要に応じて `dimid`（`0` オーバーワールド、`1` ネザー、`2` エンド）を指定します。`command` は Base64URL ブリッジで無損失転送されるため、空白、引用符、バックスラッシュ、セレクター、JSON テキストを手動でエスケープする必要はありません。
 
 ### 建築ツール（12種類）
 - `build_cube` - 立方体（中空/塗りつぶし）

@@ -32,7 +32,7 @@ npm start
 
 Open a world in Minecraft (with cheats enabled), then in chat:
 ```
-/connect localhost:8001/ws
+/connect "localhost:8001/ws"
 ```
 
 ### 3. AI Assistant Setup
@@ -69,7 +69,7 @@ For other MCP clients, refer to their respective documentation.
 
 `plugins/mcp_cmdblock_bridge/` is an optional LeviLamina / LegacyScriptEngine QuickJS plugin that lets MCP write the `Command` NBT field of command blocks. Vanilla Bedrock commands cannot write command block internals directly; after enabling this plugin, use the `blocks` tool with `action: "set_command_block"`.
 
-Install the `plugins/mcp_cmdblock_bridge/` folder into your LeviLamina / LegacyScriptEngine plugin loading directory and restart the server. MCP still connects through WebSocket as usual. Call `blocks` with `action: "set_command_block"`, `x/y/z`, `command`, and optional `dimid` (`0` Overworld, `1` Nether, `2` The End).
+Install the `plugins/mcp_cmdblock_bridge/` folder into your LeviLamina / LegacyScriptEngine plugin loading directory and restart the server. MCP still connects through WebSocket as usual. Call `blocks` with `action: "set_command_block"`, `x/y/z`, `command`, and optional `dimid` (`0` Overworld, `1` Nether, `2` The End). The `command` value is transferred losslessly through a Base64URL bridge, so spaces, quotes, backslashes, selectors, and JSON text do not need manual escaping.
 
 ### Building Tools (12 types)
 - `build_cube` - Cube (hollow/filled)
