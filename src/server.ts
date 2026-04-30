@@ -206,6 +206,9 @@ export class MinecraftMCPServer {
         };
       }
 
+      world.startInterval = () => undefined;
+      world.updatePlayerList = async () => undefined;
+
       return originalSet(connection, world);
     };
   }
