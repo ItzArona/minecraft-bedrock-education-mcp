@@ -8,7 +8,7 @@ import { SetBlockMode, FillBlocksMode } from 'socket-be';
  */
 export class BlocksTool extends BaseTool {
     readonly name = 'blocks';
-    readonly description = 'Block operations: single block placement, area filling, terrain analysis. Actions: set_block(single), fill_area(large_regions), get_top_solid_block(surface_level), query_block_data(block_info). Perfect for construction, terraforming, or analyzing terrain. Examples: set_block(x,y,z,stone), fill_area(x1,y1,z1 to x2,y2,z2,dirt), supports replace/keep/destroy modes';
+    readonly description = 'Block operations: single block placement, command block editing via optional LLSE bridge, area filling, terrain analysis. Actions: set_block(single), set_command_block(write command text to a command block), fill_area(large_regions), get_top_solid_block(surface_level), query_block_data(block_info). Perfect for construction, command automation, terraforming, or analyzing terrain.';
     
     readonly inputSchema: InputSchema = {
         type: 'object',
@@ -17,7 +17,7 @@ export class BlocksTool extends BaseTool {
                 type: 'string',
                 description: 'Block operation to perform',
                 enum: [
-                    'set_block', 'fill_area', 'get_top_solid_block', 'query_block_data',
+                    'set_block', 'set_command_block', 'fill_area', 'get_top_solid_block', 'query_block_data',
                     'query_item_data', 'query_mob_data', 'sequence'
                 ]
             },
@@ -31,6 +31,14 @@ export class BlocksTool extends BaseTool {
                 type: 'string',
                 description: 'Block ID (e.g., minecraft:stone, minecraft:dirt, minecraft:air)'
             },
+            command: {
+                type: 'string',
+                description: 'Command text to write into a command block via the optional LeviLamina/LLSE mcpsetcmd bridge plugin'
+            },
+            dimid: {
+                type: 'number',
+                description: 'Dimension ID for LLSE bridge operations: 0=Overworld, 1=Nether, 2=The End'
+            },
             mode: {
                 type: 'string',
                 description: 'Block placement/fill mode',
@@ -43,7 +51,7 @@ export class BlocksTool extends BaseTool {
                     type: 'object',
                     description: 'Block sequence step with type and action-specific parameters',
                     properties: {
-                        type: { type: 'string', description: 'Block action type, such as set_block, fill_area, get_top_solid_block, query_block_data, query_item_data, query_mob_data, or wait' },
+                        type: { type: 'string', description: 'Block action type, such as set_block, set_command_block, fill_area, get_top_solid_block, query_block_data, query_item_data, query_mob_data, or wait' },
                         wait_time: { type: 'number', description: 'Seconds to wait after this step', minimum: 0, maximum: 60 },
                         on_error: { type: 'string', enum: ['continue', 'stop', 'retry'], description: 'Error handling for this step' },
                         retry_count: { type: 'number', description: 'Max retry attempts when on_error=retry', minimum: 1, maximum: 10 }
@@ -79,6 +87,8 @@ export class BlocksTool extends BaseTool {
         y2?: number;
         z2?: number;
         block_id?: string;
+        command?: string;
+        dimid?: number;
         mode?: string;
         steps?: SequenceStep[];
     }): Promise<ToolCallResult> {
@@ -114,6 +124,29 @@ export class BlocksTool extends BaseTool {
                     if (args.mode && args.mode !== 'replace') {
                         message += ` with mode: ${args.mode}`;
                     }
+                    break;
+
+                case 'set_command_block':
+                    if (args.x === undefined || args.y === undefined || args.z === undefined || args.command === undefined) {
+                        return { success: false, message: 'Coordinates (x,y,z) and command required for set_command_block' };
+                    }
+
+                    if (!this.validateCoordinates(args.x, args.y, args.z)) {
+                        return { success: false, message: 'Invalid coordinates. Y must be between -64 and 320.' };
+                    }
+
+                    const dimid = args.dimid ?? 0;
+                    if (![0, 1, 2].includes(dimid)) {
+                        return { success: false, message: 'Invalid dimid. Use 0=Overworld, 1=Nether, or 2=The End.' };
+                    }
+
+                    // mcpsetcmd 由工作区 plugins/mcp_cmdblock_bridge.js 中的 LLSE 插件注册。
+                    result = await this.executeCommand(`mcpsetcmd ${Math.floor(args.x)} ${Math.floor(args.y)} ${Math.floor(args.z)} ${dimid} ${args.command}`);
+                    if (!result.success) {
+                        return result;
+                    }
+
+                    message = `Command block command set at (${args.x}, ${args.y}, ${args.z}) in dimension ${dimid}`;
                     break;
 
                 case 'fill_area':
