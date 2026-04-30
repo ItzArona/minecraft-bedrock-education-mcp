@@ -67,9 +67,9 @@ For other MCP clients, refer to their respective documentation.
 
 ### LeviLamina Command Block Bridge
 
-`plugins/mcp_cmdblock_bridge.js` is an optional LeviLamina / LegacyScriptEngine QuickJS plugin that lets MCP write the `Command` NBT field of command blocks. Vanilla Bedrock commands cannot write command block internals directly; after enabling this plugin, use the `blocks` tool with `action: "set_command_block"`.
+`plugins/mcp_cmdblock_bridge/` is an optional LeviLamina / LegacyScriptEngine QuickJS plugin that lets MCP write the `Command` NBT field of command blocks. Vanilla Bedrock commands cannot write command block internals directly; after enabling this plugin, use the `blocks` tool with `action: "set_command_block"`.
 
-Install `plugins/mcp_cmdblock_bridge.js` into your LeviLamina / LegacyScriptEngine plugin loading directory and restart the server. MCP still connects through WebSocket as usual. Call `blocks` with `action: "set_command_block"`, `x/y/z`, `command`, and optional `dimid` (`0` Overworld, `1` Nether, `2` The End).
+Install the `plugins/mcp_cmdblock_bridge/` folder into your LeviLamina / LegacyScriptEngine plugin loading directory and restart the server. MCP still connects through WebSocket as usual. Call `blocks` with `action: "set_command_block"`, `x/y/z`, `command`, and optional `dimid` (`0` Overworld, `1` Nether, `2` The End).
 
 ### Building Tools (12 types)
 - `build_cube` - Cube (hollow/filled)

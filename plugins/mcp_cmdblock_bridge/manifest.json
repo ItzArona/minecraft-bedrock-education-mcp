@@ -1,0 +1,10 @@
+{
+  "entry": "mcp_cmdblock_bridge.js",
+  "name": "mcp_cmdblock_bridge",
+  "type": "lse-quickjs",
+  "dependencies": [
+    {
+      "name": "legacy-script-engine-quickjs"
+    }
+  ]
+}

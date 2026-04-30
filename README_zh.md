@@ -67,9 +67,9 @@ npm start
 
 ### LeviLamina 命令方块桥接插件
 
-仓库内的 `plugins/mcp_cmdblock_bridge.js` 是可选的 LeviLamina / LegacyScriptEngine QuickJS 插件，用于让 MCP 写入命令方块的 `Command` NBT 字段。原版 Bedrock 命令无法直接写入命令方块内部指令，启用该插件后可以使用 `blocks` 工具的 `set_command_block` 动作。
+仓库内的 `plugins/mcp_cmdblock_bridge/` 是可选的 LeviLamina / LegacyScriptEngine QuickJS 插件，用于让 MCP 写入命令方块的 `Command` NBT 字段。原版 Bedrock 命令无法直接写入命令方块内部指令，启用该插件后可以使用 `blocks` 工具的 `set_command_block` 动作。
 
-使用方式：将 `plugins/mcp_cmdblock_bridge.js` 安装到你的 LeviLamina / LegacyScriptEngine 插件加载目录后重启服务器。MCP 侧仍然只需要连接 WebSocket，调用 `blocks` 时使用 `action: "set_command_block"`、`x/y/z`、`command`，可选 `dimid`（`0` 主世界，`1` 下界，`2` 末地）。
+使用方式：将 `plugins/mcp_cmdblock_bridge/` 文件夹安装到你的 LeviLamina / LegacyScriptEngine 插件加载目录后重启服务器。MCP 侧仍然只需要连接 WebSocket，调用 `blocks` 时使用 `action: "set_command_block"`、`x/y/z`、`command`，可选 `dimid`（`0` 主世界，`1` 下界，`2` 末地）。
 
 ### 建筑工具 (12 种)
 - `build_cube` - 立方体（空心/实心）
