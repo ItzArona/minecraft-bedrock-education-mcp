@@ -9,6 +9,14 @@ import { SetBlockMode, FillBlocksMode } from 'socket-be';
 export class BlocksTool extends BaseTool {
     readonly name = 'blocks';
     readonly description = 'Block operations: single block placement, command block editing via optional LLSE bridge, area filling, terrain analysis. Actions: set_block(single), set_command_block(write command text to a command block), fill_area(large_regions), get_top_solid_block(surface_level), query_block_data(block_info). Perfect for construction, command automation, terraforming, or analyzing terrain.';
+
+    private encodeCommandText(command: string): string {
+        return Buffer.from(command, 'utf8')
+            .toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/g, '');
+    }
     
     readonly inputSchema: InputSchema = {
         type: 'object',
@@ -33,7 +41,7 @@ export class BlocksTool extends BaseTool {
             },
             command: {
                 type: 'string',
-                description: 'Command text to write into a command block via the optional LeviLamina/LLSE mcpsetcmd bridge plugin'
+                description: 'Raw command text to write into a command block via the optional LeviLamina/LLSE mcpsetcmd64 bridge plugin. Supports spaces, quotes, backslashes, selectors, and JSON text without manual escaping.'
             },
             dimid: {
                 type: 'number',
@@ -140,8 +148,9 @@ export class BlocksTool extends BaseTool {
                         return { success: false, message: 'Invalid dimid. Use 0=Overworld, 1=Nether, or 2=The End.' };
                     }
 
-                    // mcpsetcmd 由工作区 plugins/mcp_cmdblock_bridge.js 中的 LLSE 插件注册。
-                    result = await this.executeCommand(`mcpsetcmd ${Math.floor(args.x)} ${Math.floor(args.y)} ${Math.floor(args.z)} ${dimid} ${args.command}`);
+                    // mcpsetcmd64 由工作区 plugins/mcp_cmdblock_bridge/ 中的 LLSE 插件注册。
+                    const encodedCommand = this.encodeCommandText(args.command);
+                    result = await this.executeCommand(`mcpsetcmd64 ${Math.floor(args.x)} ${Math.floor(args.y)} ${Math.floor(args.z)} ${dimid} ${encodedCommand}`);
                     if (!result.success) {
                         return result;
                     }

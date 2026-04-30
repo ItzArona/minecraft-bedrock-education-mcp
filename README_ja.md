@@ -32,8 +32,14 @@ npm start
 
 Minecraftでワールドを開き（チート有効）、チャット欄で：
 ```
-/connect localhost:8001/ws
+/connect "localhost:8001/ws"
 ```
+
+Minecraft がすぐに接続終了を表示する場合は、`node dist/server.js --debug-ws` で MCP サーバーを再起動し、同じコマンドを再試行してください。デバッグログには Minecraft が WebSocket サーバーへ到達したか、どのコードで閉じられたかが表示されます。`node dist/server.js --disable-encryption --debug-ws` も確認できますが、暗号化無効化は信頼できるローカル環境または LAN でのみ使用してください。
+
+古いまたは新しい Bedrock クライアントでは、まず `node dist/server.js --disable-encryption --debug-ws --minecraft-version=1.26.10` を試してください。必要に応じて `--command-version=35`、`--command-version=34`、`--command-version=36`、`--command-version=42` も確認してください。
+
+接続問題を Socket-BE の自動プレイヤーリストポーリングと切り分けるため、`node dist/server.js --disable-encryption --debug-ws --no-player-list-poll` でも起動できます。
 
 ### 3. AIアシスタント設定
 
@@ -69,7 +75,7 @@ MCPクライアント（Claude Desktop等）の設定ファイルに追加：
 
 `plugins/mcp_cmdblock_bridge/` は任意で導入できる LeviLamina / LegacyScriptEngine QuickJS プラグインです。MCP からコマンドブロックの `Command` NBT フィールドを書き込めるようにします。通常の Bedrock コマンドではコマンドブロック内部のコマンドを直接書き込めないため、このプラグインを有効にした後は `blocks` ツールで `action: "set_command_block"` を使用してください。
 
-`plugins/mcp_cmdblock_bridge/` フォルダー全体を LeviLamina / LegacyScriptEngine のプラグイン読み込みディレクトリに配置し、サーバーを再起動します。MCP 側は従来どおり WebSocket に接続します。`blocks` を呼び出す際は `action: "set_command_block"`、`x/y/z`、`command`、必要に応じて `dimid`（`0` オーバーワールド、`1` ネザー、`2` エンド）を指定します。
+`plugins/mcp_cmdblock_bridge/` フォルダー全体を LeviLamina / LegacyScriptEngine のプラグイン読み込みディレクトリに配置し、サーバーを再起動します。MCP 側は従来どおり WebSocket に接続します。`blocks` を呼び出す際は `action: "set_command_block"`、`x/y/z`、`command`、必要に応じて `dimid`（`0` オーバーワールド、`1` ネザー、`2` エンド）を指定します。`command` は Base64URL ブリッジで無損失転送されるため、空白、引用符、バックスラッシュ、セレクター、JSON テキストを手動でエスケープする必要はありません。
 
 ### 建築ツール（12種類）
 - `build_cube` - 立方体（中空/塗りつぶし）

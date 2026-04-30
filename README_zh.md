@@ -32,8 +32,14 @@ npm start
 
 在 Minecraft 中打开一个世界（需启用作弊），然后在聊天栏输入：
 ```
-/connect localhost:8001/ws
+/connect "localhost:8001/ws"
 ```
+
+如果 Minecraft 立即提示连接已关闭，请使用 `node dist/server.js --debug-ws` 重新启动 MCP 服务器后再尝试同一条命令。调试日志会显示 Minecraft 是否真正连到了 WebSocket 服务以及关闭码。也可以测试 `node dist/server.js --disable-encryption --debug-ws`；禁用加密只建议在可信本机或局域网环境中使用。
+
+对于较旧或较新的 Bedrock 客户端，请优先测试 `node dist/server.js --disable-encryption --debug-ws --minecraft-version=1.26.10`。如仍有问题，再尝试 `--command-version=35`、`--command-version=34`、`--command-version=36` 或 `--command-version=42`。
+
+为了把连接问题和 Socket-BE 的自动玩家列表轮询隔离开，也可以使用 `node dist/server.js --disable-encryption --debug-ws --no-player-list-poll` 启动服务端。
 
 ### 3. AI 助手设置
 
@@ -69,7 +75,7 @@ npm start
 
 仓库内的 `plugins/mcp_cmdblock_bridge/` 是可选的 LeviLamina / LegacyScriptEngine QuickJS 插件，用于让 MCP 写入命令方块的 `Command` NBT 字段。原版 Bedrock 命令无法直接写入命令方块内部指令，启用该插件后可以使用 `blocks` 工具的 `set_command_block` 动作。
 
-使用方式：将 `plugins/mcp_cmdblock_bridge/` 文件夹安装到你的 LeviLamina / LegacyScriptEngine 插件加载目录后重启服务器。MCP 侧仍然只需要连接 WebSocket，调用 `blocks` 时使用 `action: "set_command_block"`、`x/y/z`、`command`，可选 `dimid`（`0` 主世界，`1` 下界，`2` 末地）。
+使用方式：将 `plugins/mcp_cmdblock_bridge/` 文件夹安装到你的 LeviLamina / LegacyScriptEngine 插件加载目录后重启服务器。MCP 侧仍然只需要连接 WebSocket，调用 `blocks` 时使用 `action: "set_command_block"`、`x/y/z`、`command`，可选 `dimid`（`0` 主世界，`1` 下界，`2` 末地）。现在 `command` 会通过 Base64URL 桥接无损传输，空格、引号、反斜杠、选择器和 JSON 文本都不需要手工转义。
 
 ### 建筑工具 (12 种)
 - `build_cube` - 立方体（空心/实心）

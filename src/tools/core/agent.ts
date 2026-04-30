@@ -106,7 +106,18 @@ export class AgentTool extends BaseTool {
         steps?: SequenceStep[];
     }): Promise<ToolCallResult> {
         if (!this.agent) {
-            return { success: false, message: 'Agent not available. Ensure Minecraft is connected and agent is spawned.' };
+            if (!this.world) {
+                return { success: false, message: 'Agent not available. Ensure Minecraft is connected and agent is spawned.' };
+            }
+
+            try {
+                this.agent = await this.world.getOrCreateAgent();
+            } catch (error) {
+                return {
+                    success: false,
+                    message: `Agent not available. Failed to create agent: ${error instanceof Error ? error.message : String(error)}`
+                };
+            }
         }
 
         try {

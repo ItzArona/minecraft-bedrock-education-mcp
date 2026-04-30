@@ -63,7 +63,7 @@ import { enrichErrorWithHints } from "./utils/error-hints";
  * const server = new MinecraftMCPServer();
  * server.start(8001);
  *
- * // 从 Minecraft 连接: /connect localhost:8001/ws
+ * // 从 Minecraft 连接: /connect "localhost:8001/ws"
  * ```
  *
  * @since 1.0.0
@@ -109,10 +109,18 @@ export class MinecraftMCPServer {
    * server.start(8001); // 在 8001 端口启动
    *
    * // 从 Minecraft 连接：
-   * // /connect localhost:8001/ws
+   * // /connect "localhost:8001/ws"
    * ```
    */
-  public async start(port: number = 8001, locale?: SupportedLocale): Promise<void> {
+  public async start(
+    port: number = 8001,
+    locale?: SupportedLocale,
+    disableEncryption: boolean = false,
+    debugWs: boolean = false,
+    commandVersion?: number,
+    disablePlayerListPoll: boolean = false,
+    minecraftVersion?: string
+  ): Promise<void> {
     // 初始化语言设置
     initializeLocale(locale);
 
@@ -120,7 +128,7 @@ export class MinecraftMCPServer {
     await this.setupMCPServer();
 
     // 启动 Socket-BE 服务器
-    this.setupSocketBEServer(port);
+    this.setupSocketBEServer(port, disableEncryption, debugWs, commandVersion, disablePlayerListPoll, minecraftVersion);
 
     // 注册事件处理程序
     this.setupEventHandlers();
@@ -149,15 +157,141 @@ export class MinecraftMCPServer {
    * 启动 Socket-BE 服务器
    * @private
    */
-  private setupSocketBEServer(port: number): void {
+  private setupSocketBEServer(
+    port: number,
+    disableEncryption: boolean,
+    debugWs: boolean,
+    commandVersion?: number,
+    disablePlayerListPoll: boolean = false,
+    minecraftVersion?: string
+  ): void {
     // 启动 Socket-BE Minecraft 服务器
-    this.socketBE = new SocketBE({ port });
+    this.socketBE = new SocketBE({ port, disableEncryption, commandVersion });
+
+    this.patchSocketBEWorldCommands(disablePlayerListPoll, minecraftVersion);
+
+    if (debugWs) {
+      this.attachWebSocketDebugLogging();
+    }
 
     // 仅在非 MCP 模式（有 TTY）时输出日志到 stderr
     if (process.stdin.isTTY !== false) {
       console.error(t(CORE_MESSAGES, "SERVER_STARTING", port));
       console.error(t(CORE_MESSAGES, "CONNECT_COMMAND", port));
+      if (disableEncryption) {
+        console.error(t(CORE_MESSAGES, "ENCRYPTION_DISABLED"));
+      }
+      if (debugWs) {
+        console.error(t(CORE_MESSAGES, "WS_DEBUG_ENABLED"));
+      }
+      if (commandVersion !== undefined) {
+        console.error(t(CORE_MESSAGES, "COMMAND_VERSION", commandVersion));
+      }
+      if (disablePlayerListPoll) {
+        console.error(t(CORE_MESSAGES, "PLAYER_LIST_POLL_DISABLED"));
+      }
+      if (minecraftVersion) {
+        console.error(t(CORE_MESSAGES, "MINECRAFT_VERSION", minecraftVersion));
+      }
     }
+  }
+
+  private patchSocketBEWorldCommands(disablePlayerListPoll: boolean = false, minecraftVersion?: string): void {
+    const worlds = (this.socketBE as any)?.worlds;
+    const originalSet = worlds?.set?.bind(worlds);
+    if (!worlds || !originalSet || (worlds as any).__mcpPatched) return;
+
+    (worlds as any).__mcpPatched = true;
+
+    worlds.set = (connection: any, world: any) => {
+      const originalRunCommand = world.runCommand?.bind(world);
+
+      if (originalRunCommand) {
+        world.runCommand = async (command: string, options?: any) => {
+          const requestId = uuidv4();
+          const body: Record<string, unknown> = {
+            commandLine: command,
+            origin: { type: "player" }
+          };
+
+          const version = options?.minecraftVersion ?? minecraftVersion;
+          if (typeof version === "string" && version.trim().length > 0) {
+            body.version = version;
+          }
+
+          const payload = JSON.stringify({
+            header: {
+              version: 1,
+              requestId,
+              messageType: "commandRequest",
+              messagePurpose: "commandRequest"
+            },
+            body
+          });
+
+          if (options?.noResponse) {
+            world.connection.send(payload);
+            return { statusCode: 0, statusMessage: "" };
+          }
+
+          const pendingResponse = world.connection.awaitResponse(requestId, options?.timeout);
+          world.connection.send(payload);
+          const response = await pendingResponse;
+          return response.toCommandResult();
+        };
+      }
+
+      if (disablePlayerListPoll) {
+        world.startInterval = () => undefined;
+        world.updatePlayerList = async () => undefined;
+      }
+
+      return originalSet(connection, world);
+    };
+  }
+
+  private attachWebSocketDebugLogging(): void {
+    const webSocketServer = (this.socketBE as any)?.network?.wss;
+    if (!webSocketServer) return;
+
+    webSocketServer.on("connection", (ws: any, request: any) => {
+      const remote = `${request?.socket?.remoteAddress ?? "unknown"}:${request?.socket?.remotePort ?? "unknown"}`;
+      const url = request?.url ?? "unknown";
+      console.error(`[SocketBE debug] WebSocket connected from ${remote} path=${url}`);
+
+      let outboundCount = 0;
+      const originalSend = ws.send.bind(ws);
+      ws.send = (data: any, ...args: any[]) => {
+        outboundCount += 1;
+        if (outboundCount <= 20) {
+          const text = Buffer.isBuffer(data) ? data.toString("utf8") : String(data);
+          console.error(`[SocketBE debug] Server packet #${outboundCount}: ${text.slice(0, 500)}`);
+        }
+        return originalSend(data, ...args);
+      };
+
+      let inboundCount = 0;
+      ws.on("message", (data: Buffer) => {
+        inboundCount += 1;
+        if (inboundCount <= 20) {
+          const text = data.toString("utf8");
+          console.error(`[SocketBE debug] Client packet #${inboundCount}: ${text.slice(0, 500)}`);
+        }
+      });
+
+      ws.once("message", (data: Buffer) => {
+        const text = data.toString("utf8");
+        console.error(`[SocketBE debug] First client packet: ${text.slice(0, 300)}`);
+      });
+
+      ws.on("close", (code: number, reason: Buffer) => {
+        console.error(`[SocketBE debug] WebSocket closed code=${code} reason=${reason.toString("utf8")}`);
+      });
+
+      ws.on("error", (error: Error) => {
+        console.error(`[SocketBE debug] WebSocket error: ${error.message}`);
+      });
+    });
   }
 
   /**
@@ -206,7 +340,6 @@ export class MinecraftMCPServer {
         const worlds = this.socketBE?.worlds;
         if (worlds && worlds instanceof Map && worlds.size > 0) {
           await this.initializeWorld(Array.from(worlds.values())[0]);
-          await this.sendWorldMessage(t(CORE_MESSAGES, "CONNECTION_COMPLETE"));
         }
       } catch (error) {
         // 强制设置失败时忽略，继续运行服务器
@@ -224,7 +357,6 @@ export class MinecraftMCPServer {
         const worlds = this.socketBE.worlds;
         if (worlds instanceof Map && worlds.size > 0) {
           await this.initializeWorld(Array.from(worlds.values())[0]);
-          await this.sendWorldMessage(t(CORE_MESSAGES, "DELAYED_CONNECTION"));
         }
       }
     }, intervalMs);
@@ -237,13 +369,8 @@ export class MinecraftMCPServer {
   private async initializeWorld(world: World): Promise<void> {
     this.currentWorld = world;
 
-    // 获取代理 (Agent)
-    try {
-      this.currentAgent = await this.currentWorld.getOrCreateAgent();
-    } catch (agentError) {
-      // 获取代理失败时也继续运行服务器
-      this.currentAgent = null;
-    }
+    // 不在连接初始化时自动创建 agent，避免因权限不足踢掉客户端。
+    this.currentAgent = null;
 
     // 设置临时玩家信息
     if (!this.connectedPlayer) {
@@ -289,9 +416,6 @@ export class MinecraftMCPServer {
       console.error(t(CORE_MESSAGES, "PLAYER_JOINED", ev.player.name));
     }
 
-    // 向 Minecraft 发送加入确认消息
-    await this.sendWorldMessage(t(CORE_MESSAGES, "WELCOME_MESSAGE", ev.player.name));
-
     this.connectedPlayer = {
       ws: null, // SocketBE 中不需要直接访问 ws
       name: ev.player.name || "unknown",
@@ -300,15 +424,7 @@ export class MinecraftMCPServer {
 
     this.currentWorld = ev.world;
 
-    // 获取代理 (Agent)
-    try {
-      if (this.currentWorld) {
-        this.currentAgent = await this.currentWorld.getOrCreateAgent();
-      }
-    } catch (error) {
-      console.error("Failed to get or create agent:", error);
-      this.currentAgent = null;
-    }
+    this.currentAgent = null;
 
     // 更新所有工具的 Socket-BE 实例
     this.updateToolsWithWorldInstances();
@@ -689,9 +805,50 @@ const getLocale = (): SupportedLocale | undefined => {
   return undefined;
 };
 
+const getDisableEncryption = (): boolean => {
+  return process.argv.includes("--disable-encryption");
+};
+
+const getDebugWs = (): boolean => {
+  return process.argv.includes("--debug-ws");
+};
+
+const getCommandVersion = (): number | undefined => {
+  const arg = process.argv.find((value) => value.startsWith("--command-version="));
+  if (!arg) return undefined;
+
+  const value = Number(arg.split("=")[1]);
+  if (!Number.isInteger(value) || value < 1 || value > 42) {
+    throw new Error("Invalid --command-version. Use an integer between 1 and 42.");
+  }
+
+  return value;
+};
+
+const getDisablePlayerListPoll = (): boolean => {
+  return process.argv.includes("--no-player-list-poll");
+};
+
+const getMinecraftVersion = (): string | undefined => {
+  const arg = process.argv.find((value) => value.startsWith("--minecraft-version="));
+  if (!arg) return undefined;
+
+  const value = arg.split("=")[1]?.trim();
+  if (!value) {
+    throw new Error("Invalid --minecraft-version. Use a non-empty version string like 1.26.10.");
+  }
+
+  return value;
+};
+
 const port = getPort();
 const locale = getLocale();
-server.start(port, locale);
+const disableEncryption = getDisableEncryption();
+const debugWs = getDebugWs();
+const commandVersion = getCommandVersion();
+const disablePlayerListPoll = getDisablePlayerListPoll();
+const minecraftVersion = getMinecraftVersion();
+server.start(port, locale, disableEncryption, debugWs, commandVersion, disablePlayerListPoll, minecraftVersion);
 
 process.on("SIGINT", () => {
   process.exit(0);
