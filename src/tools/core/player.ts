@@ -66,11 +66,19 @@ export class PlayerTool extends BaseTool {
             },
             can_destroy: {
                 type: 'array',
-                description: 'Blocks this item can destroy (optional)'
+                description: 'Blocks this item can destroy (optional)',
+                items: {
+                    type: 'string',
+                    description: 'Block ID that this item can destroy'
+                }
             },
             can_place_on: {
                 type: 'array', 
-                description: 'Blocks this item can be placed on (optional)'
+                description: 'Blocks this item can be placed on (optional)',
+                items: {
+                    type: 'string',
+                    description: 'Block ID that this item can be placed on'
+                }
             },
             keep_on_death: {
                 type: 'boolean',

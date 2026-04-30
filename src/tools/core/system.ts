@@ -78,7 +78,19 @@ export class SystemTool extends BaseTool {
             },
             steps: {
                 type: 'array',
-                description: 'Array of system actions for sequence. Each step should have "category" and "action" fields and relevant parameters.'
+                description: 'Array of system actions for sequence. Each step should have "category" and "action" fields and relevant parameters.',
+                items: {
+                    type: 'object',
+                    description: 'System sequence step with category/action and relevant parameters',
+                    properties: {
+                        type: { type: 'string', description: 'System category alias used by sequence execution, such as scoreboard, screen, or wait' },
+                        category: { type: 'string', enum: ['scoreboard', 'screen'], description: 'System category' },
+                        action: { type: 'string', description: 'Action to perform within the category' },
+                        wait_time: { type: 'number', description: 'Seconds to wait after this step', minimum: 0, maximum: 60 },
+                        on_error: { type: 'string', enum: ['continue', 'stop', 'retry'], description: 'Error handling for this step' },
+                        retry_count: { type: 'number', description: 'Max retry attempts when on_error=retry', minimum: 1, maximum: 10 }
+                    }
+                }
             }
         },
         required: ['category', 'action']

@@ -96,7 +96,17 @@ export class CameraTool extends BaseTool {
             },
             shots: {
                 type: 'array',
-                description: 'Array of camera shots for sequence action. Each shot executes after the previous one completes. Each shot object should have a "type" field (move_to, smooth_move, track_entity, fade, wait) plus relevant parameters like x,y,z coordinates, duration, etc.'
+                description: 'Array of camera shots for sequence action. Each shot executes after the previous one completes. Each shot object should have a "type" field (move_to, smooth_move, track_entity, fade, wait) plus relevant parameters like x,y,z coordinates, duration, etc.',
+                items: {
+                    type: 'object',
+                    description: 'Camera shot with type and shot-specific parameters',
+                    properties: {
+                        type: { type: 'string', description: 'Shot type: move_to, smooth_move, track_entity, fade, wait, reset, or set_mode' },
+                        duration: { type: 'number', description: 'Shot duration in seconds', minimum: 0 },
+                        wait_time: { type: 'number', description: 'Seconds to wait after this shot', minimum: 0, maximum: 60 }
+                    },
+                    required: ['type']
+                }
             }
         },
         required: ['action']

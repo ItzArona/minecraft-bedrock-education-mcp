@@ -61,7 +61,18 @@ export class AgentTool extends BaseTool {
             },
             steps: {
                 type: 'array',
-                description: 'Array of agent actions for sequence. Each step should have "type" field and relevant parameters.'
+                description: 'Array of agent actions for sequence. Each step should have "type" field and relevant parameters.',
+                items: {
+                    type: 'object',
+                    description: 'Agent sequence step with type and action-specific parameters',
+                    properties: {
+                        type: { type: 'string', description: 'Agent action type, such as move, turn, teleport, attack, mine_block, place_block, inspect_block, detect_block, get_position, collect_item, drop_item, drop_all, get_inventory, set_item_in_slot, or wait' },
+                        wait_time: { type: 'number', description: 'Seconds to wait after this step', minimum: 0, maximum: 60 },
+                        on_error: { type: 'string', enum: ['continue', 'stop', 'retry'], description: 'Error handling for this step' },
+                        retry_count: { type: 'number', description: 'Max retry attempts when on_error=retry', minimum: 1, maximum: 10 }
+                    },
+                    required: ['type']
+                }
             }
         },
         required: ['action']

@@ -52,7 +52,18 @@ export class WorldTool extends BaseTool {
             },
             steps: {
                 type: 'array',
-                description: 'Array of world actions for sequence. Each step should have "type" field and relevant parameters.'
+                description: 'Array of world actions for sequence. Each step should have "type" field and relevant parameters.',
+                items: {
+                    type: 'object',
+                    description: 'World sequence step with type and action-specific parameters',
+                    properties: {
+                        type: { type: 'string', description: 'World action type, such as set_time, get_time, get_day, set_weather, get_weather, get_players, get_world_info, send_message, run_command, get_connection_info, or wait' },
+                        wait_time: { type: 'number', description: 'Seconds to wait after this step', minimum: 0, maximum: 60 },
+                        on_error: { type: 'string', enum: ['continue', 'stop', 'retry'], description: 'Error handling for this step' },
+                        retry_count: { type: 'number', description: 'Max retry attempts when on_error=retry', minimum: 1, maximum: 10 }
+                    },
+                    required: ['type']
+                }
             }
         },
         required: ['action']

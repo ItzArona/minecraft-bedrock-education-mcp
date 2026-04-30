@@ -134,8 +134,8 @@ export class SchemaToZodConverter {
                 );
             }
 
-            return z.object(nestedSchema);
+            return z.object(nestedSchema).passthrough();
         }
-        return z.object({});
+        return z.record(z.any());
     }
 }
